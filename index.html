@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Pistol Model Test</title>
+  <style>
+    html,body{margin:0;height:100%;overflow:hidden;background:#0b0d10;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+    #ui{position:fixed;z-index:10;top:14px;left:14px;color:#fff;background:#1118;padding:10px 12px;border:1px solid #ffffff1f;border-radius:12px;backdrop-filter:blur(10px)}
+    #ui b{display:block;font-size:14px;margin-bottom:3px} #ui span{font-size:12px;color:#bcc5d1}
+    canvas{display:block;width:100%;height:100%;touch-action:none}
+  </style>
+</head>
+<body>
+<div id="ui"><b>3D Model Test</b><span>Drag = rotate · Pinch/scroll = zoom</span></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/controls/OrbitControls.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0d10);
+
+const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, .1, 100);
+camera.position.set(10, 5, 11);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0,0,-.2);
+
+scene.add(new THREE.HemisphereLight(0xe7efff,0x16191d,2.2));
+const key = new THREE.DirectionalLight(0xffffff,3.2);
+key.position.set(5,8,7); key.castShadow=true; scene.add(key);
+const rim = new THREE.DirectionalLight(0x9db9ff,1.5);
+rim.position.set(-7,2,-6); scene.add(rim);
+
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(40,40),
+  new THREE.MeshStandardMaterial({color:0x13161a,roughness:.9})
+);
+floor.rotation.x=-Math.PI/2; floor.position.y=-3.85; floor.receiveShadow=true; scene.add(floor);
+
+const gun = new THREE.Group(); scene.add(gun);
+const mat = c => new THREE.MeshStandardMaterial({color:c,roughness:.68,metalness:.12});
+const M = {mid:mat(0x303438), dark:mat(0x202326), black:mat(0x0d0f10), rubber:mat(0x25282b), metal:mat(0x3a3e42)};
+
+function box(x,y,z,px,py,pz,m){
+  const o=new THREE.Mesh(new THREE.BoxGeometry(x,y,z),m); o.position.set(px,py,pz); o.castShadow=o.receiveShadow=true; gun.add(o); return o;
+}
+function cyl(r,h,px,py,pz,axis,m,segments=28){
+  const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,segments),m);
+  if(axis==='x') o.rotation.z=Math.PI/2;
+  if(axis==='z') o.rotation.x=Math.PI/2;
+  o.position.set(px,py,pz); o.castShadow=o.receiveShadow=true; gun.add(o); return o;
+}
+function prismXZ(points,depth,m){
+  const shape=new THREE.Shape(); shape.moveTo(points[0][0],points[0][1]);
+  for(let i=1;i<points.length;i++) shape.lineTo(points[i][0],points[i][1]);
+  shape.closePath();
+  const g=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:false});
+  g.rotateX(Math.PI/2); g.translate(0,depth/2,0);
+  const o=new THREE.Mesh(g,m); o.castShadow=o.receiveShadow=true; gun.add(o); return o;
+}
+
+// Slide + frame
+box(6.8,1.15,.92,0,0,1.45,M.mid);
+box(6.35,1.10,.20,.05,0,.90,M.dark);
+box(.55,1.07,.32,-3.05,0,1.03,M.dark);
+box(1.25,.03,.33,.55,-.59,1.52,M.black);
+
+prismXZ([[-2.8,.82],[2.25,.82],[2.15,.25],[1.15,-.30],[-.55,-.30],[-1.10,.10],[-2.8,.24]],.92,M.dark);
+prismXZ([[1.05,.22],[2.25,.22],[3,-2.95],[1.65,-3.12]],1.0,M.rubber);
+
+// Magazine
+box(1.55,1.10,.28,2.28,0,-3.20,M.black);
+box(.65,1.05,.55,1.88,0,-3.43,M.black);
+
+// Trigger guard
+box(2.10,.78,.16,.15,0,-.48,M.dark);
+box(1.55,.78,.16,-.05,0,-1.20,M.dark);
+box(.16,.78,.82,-.92,0,-.83,M.dark);
+box(.16,.78,.70,.92,0,-.80,M.dark);
+const trigger=box(.16,.38,.75,.2,-.02,-.74,M.black); trigger.rotation.y=-THREE.MathUtils.degToRad(18);
+
+// Rail
+[-2.2,-1.85,-1.5,-1.15].forEach(x=>box(.12,.98,.12,x,0,.05,M.black));
+
+// Sights
+box(.18,.52,.22,-2.6,0,2.03,M.black);
+box(.32,.64,.26,2.55,0,2.04,M.black);
+
+// Muzzle + barrel
+cyl(.27,.12,-3.46,0,1.46,'x',M.black,32);
+cyl(.19,.30,-3.28,0,1.46,'x',M.metal,32);
+
+// Rear slide serrations
+for(let i=0;i<7;i++) box(.045,.04,.52,2.25+i*.125,-.59,1.38,M.black);
+
+// Grip texture
+for(let zi=0;zi<8;zi++){
+  const z=-2.65+zi*(2.30/7);
+  for(let xi=0;xi<5;xi++){
+    const x=1.45+xi*(1.10/4);
+    if((xi+zi)%2===0) box(.09,.035,.09,x,-.52,z,M.black);
+  }
+}
+
+// Controls
+cyl(.10,.05,1.10,-.49,.48,'z',M.black,20);
+cyl(.08,.05,.52,-.49,.52,'z',M.black,20);
+cyl(.17,.05,3.0,-.60,1.55,'z',M.black,24);
+
+// Match the side-reference orientation
+gun.rotation.x = THREE.MathUtils.degToRad(-3);
+gun.rotation.y = THREE.MathUtils.degToRad(-18);
+
+function frame(){
+  requestAnimationFrame(frame);
+  controls.update();
+  renderer.render(scene,camera);
+}
+frame();
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
